@@ -16,5 +16,5 @@ public interface MetricFactory {
    void enableKnownMetric(KnownMetric metric);
    Map<String, MetricManager> getAllMetrics();
    boolean isEnable();
-
+   System.out.println("added test");
 }
