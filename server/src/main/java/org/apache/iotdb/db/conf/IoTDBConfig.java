@@ -849,6 +849,12 @@ public class IoTDBConfig {
   private boolean debugState = false;
 
   /**
+   * whether enable the rpc service. This parameter has no a corresponding field
+   * in the iotdb-engine.properties
+   */
+  private boolean enableRPCService = true;
+
+  /**
    * the size of ioTaskQueue
    */
   private int ioTaskQueueSizeForFlushing = 10;
@@ -1082,7 +1088,7 @@ public class IoTDBConfig {
     return rpcAddress;
   }
 
-  void setRpcAddress(String rpcAddress) {
+  public void setRpcAddress(String rpcAddress) {
     this.rpcAddress = rpcAddress;
   }
 
@@ -1090,7 +1096,7 @@ public class IoTDBConfig {
     return rpcPort;
   }
 
-  void setRpcPort(int rpcPort) {
+  public void setRpcPort(int rpcPort) {
     this.rpcPort = rpcPort;
   }
 
@@ -2276,6 +2282,15 @@ public class IoTDBConfig {
 
   public void setMlogBufferSize(int mlogBufferSize) {
     this.mlogBufferSize = mlogBufferSize;
+  }
+
+
+  public boolean isEnableRPCService() {
+    return enableRPCService;
+  }
+
+  public void setEnableRPCService(boolean enableRPCService) {
+    this.enableRPCService = enableRPCService;
   }
 
   public int getIoTaskQueueSizeForFlushing() {

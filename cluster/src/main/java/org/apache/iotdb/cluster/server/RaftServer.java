@@ -79,7 +79,7 @@ public abstract class RaftServer implements RaftService.AsyncIface, RaftService.
 
   RaftServer() {
     thisNode = new Node();
-    thisNode.setIp(config.getClusterRpcIp());
+    thisNode.setIp(config.getInternalIp());
     thisNode.setMetaPort(config.getInternalMetaPort());
     thisNode.setDataPort(config.getInternalDataPort());
     thisNode.setClientPort(config.getClusterRpcPort());
@@ -220,7 +220,8 @@ public abstract class RaftServer implements RaftService.AsyncIface, RaftService.
   }
 
   private void establishServer() throws TTransportException {
-    logger.info("Cluster node {} begins to set up", thisNode);
+    logger.info("[{}] Cluster node {} begins to set up with {} mode", getServerClientName(), thisNode,
+        ClusterDescriptor.getInstance().getConfig().isUseAsyncServer()? "Async" : "Sync");
 
     if (ClusterDescriptor.getInstance().getConfig().isUseAsyncServer()) {
       poolServer = createAsyncServer();
@@ -229,9 +230,10 @@ public abstract class RaftServer implements RaftService.AsyncIface, RaftService.
     }
 
     clientService = Executors.newSingleThreadExecutor(r -> new Thread(r, getServerClientName()));
+
     clientService.submit(() -> poolServer.serve());
 
-    logger.info("Cluster node {} is up", thisNode);
+    logger.info("[{}] Cluster node {} is up", getServerClientName(), thisNode);
   }
 
   @TestOnly

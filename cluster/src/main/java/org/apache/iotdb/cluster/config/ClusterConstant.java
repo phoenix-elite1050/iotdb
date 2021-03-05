@@ -41,7 +41,7 @@ public class ClusterConstant {
     // constant class
   }
 
-  static final String CLUSTER_CONF = "CLUSTER_CONF";
+  public static final String CLUSTER_CONF = "CLUSTER_CONF";
 
   /**
    * a failed election will restart in 2s~5s, this should be at least as long as a heartbeat

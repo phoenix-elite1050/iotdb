@@ -23,9 +23,16 @@ import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import org.apache.commons.cli.CommandLine;
+import org.apache.commons.cli.CommandLineParser;
+import org.apache.commons.cli.DefaultParser;
+import org.apache.commons.cli.Option;
+import org.apache.commons.cli.Options;
+import org.apache.commons.cli.ParseException;
 import org.apache.iotdb.cluster.client.async.AsyncMetaClient;
 import org.apache.iotdb.cluster.client.sync.SyncClientAdaptor;
 import org.apache.iotdb.cluster.config.ClusterConfig;
+import org.apache.iotdb.cluster.config.ClusterConstant;
 import org.apache.iotdb.cluster.config.ClusterDescriptor;
 import org.apache.iotdb.cluster.exception.ConfigInconsistentException;
 import org.apache.iotdb.cluster.exception.StartUpCheckFailureException;
@@ -35,6 +42,7 @@ import org.apache.iotdb.cluster.rpc.thrift.Node;
 import org.apache.iotdb.cluster.server.MetaClusterServer;
 import org.apache.iotdb.cluster.server.Response;
 import org.apache.iotdb.cluster.utils.ClusterUtils;
+import org.apache.iotdb.db.conf.IoTDBConstant;
 import org.apache.iotdb.db.conf.IoTDBDescriptor;
 import org.apache.iotdb.db.exception.StartupException;
 import org.apache.iotdb.db.exception.query.QueryProcessException;
@@ -58,35 +66,42 @@ public class ClusterMain {
   // send a request to remove a node, more arguments: ip-of-removed-node
   // metaport-of-removed-node
   private static final String MODE_REMOVE = "-r";
-  // the separator between the cluster configuration and the single-server configuration
-  private static final String SERVER_CONF_SEPARATOR = "-sc";
+
   private static MetaClusterServer metaServer;
 
   public static void main(String[] args) {
     if (args.length < 1) {
-      logger.error("Usage: <-s|-a|-r> [-internal_meta_port <internal meta port>] "
-          + "[-internal_data_port <internal data port>] "
-          + "[-cluster_rpc_port <cluster rpc port>] "
-          + "[-seed_nodes <node1:meta_port:data_port:cluster_rpc_port,"
-          +               "node2:meta_port:data_port:cluster_rpc_port,"
-          +           "...,noden:meta_port:data_port:cluster_rpc_port>] "
-          + "[-sc] "
-          + "[-rpc_port <rpc port>]");
+      logger.error("Usage: <-s|-a|-r> "
+              + "[-D{} <cluster module configure file>] "
+              + "[-D{} <server module configure file>] "
+              + "-s: start the node as a seed\n"
+              + "-a: start the node as a new node\n"
+              + "-r: remove the node out of the cluster\n",
+          ClusterConstant.CLUSTER_CONF,
+          IoTDBConstant.IOTDB_CONF
+      );
+
       return;
     }
-    String mode = args[0];
-    if (args.length > 1) {
-      String[] params = Arrays.copyOfRange(args, 1, args.length);
-      replaceDefaultPrams(params);
-    }
+
+    // init server's configuration first, because the cluster configuration may read settings from
+    // the server's configuration.
+    IoTDBDescriptor.getInstance().getConfig().setEnableRPCService(false);
+    IoTDBDescriptor.getInstance().getConfig().setSyncEnable(false);
+    //auto create schema is took over by cluster module, so we disable it in the server module.
+    IoTDBDescriptor.getInstance().getConfig().setAutoCreateSchemaEnabled(false);
 
     // params check
     if (!checkConfig()) {
       return;
     }
 
-    IoTDBDescriptor.getInstance().getConfig().setSyncEnable(false);
-    IoTDBDescriptor.getInstance().getConfig().setAutoCreateSchemaEnabled(false);
+    String mode = args[0];
+    if (args.length > 1) {
+      String[] params = Arrays.copyOfRange(args, 1, args.length);
+      replaceDefaultProps(params);
+    }
+
     logger.info("Running mode {}", mode);
     if (MODE_START.equals(mode)) {
       try {
@@ -164,41 +179,13 @@ public class ClusterMain {
 
     // assert this node is in seed nodes list
     Node localNode = new Node();
-    localNode.setIp(config.getClusterRpcIp()).setMetaPort(config.getInternalMetaPort())
+    localNode.setIp(IoTDBDescriptor.getInstance().getConfig().getRpcAddress()).setMetaPort(config.getInternalMetaPort())
         .setDataPort(config.getInternalDataPort()).setClientPort(config.getClusterRpcPort());
     if (!seedNodes.contains(localNode)) {
       String message = String.format(
           "SeedNodes must contains local node in start-server mode. LocalNode: %s ,SeedNodes: %s",
           localNode.toString(), config.getSeedNodeUrls());
       throw new StartupException(metaServer.getMember().getName(), message);
-    }
-  }
-
-  private static void replaceDefaultPrams(String[] args) {
-    int index;
-    String[] clusterParams;
-    String[] serverParams = null;
-    for (index = 0; index < args.length; index++) {
-      //find where -sc is
-      if (SERVER_CONF_SEPARATOR.equals(args[index])) {
-        break;
-      }
-    }
-    //parameters from 0 to "-sc" are for clusters
-    clusterParams = Arrays.copyOfRange(args, 0, index);
-
-    if (index < args.length) {
-      serverParams = Arrays.copyOfRange(args, index + 1, args.length);
-    }
-
-    if (clusterParams.length > 0) {
-      // replace the cluster default conf params
-      ClusterDescriptor.getInstance().replaceProps(clusterParams);
-    }
-
-    if (serverParams != null && serverParams.length > 0) {
-      // replace the server default conf params
-      IoTDBDescriptor.getInstance().replaceProps(serverParams);
     }
   }
 
@@ -215,22 +202,111 @@ public class ClusterMain {
     }
 
     // 1. check the cluster_rpc_ip and seed_nodes consistent or not
-    // when clusterRpcIp is 127.0.0.1, the entire cluster must be start locally
+    // when rpc_address is 127.0.0.1, the entire cluster must be start locally
     ClusterConfig config = ClusterDescriptor.getInstance().getConfig();
     String localhostIp = "127.0.0.1";
-    String configClusterRpcIp = config.getClusterRpcIp();
+    String rpcIp = IoTDBDescriptor.getInstance().getConfig().getRpcAddress();
     List<String> seedNodes = config.getSeedNodeUrls();
-    boolean isLocalCluster = localhostIp.equals(configClusterRpcIp);
+    boolean isLocalCluster = localhostIp.equals(rpcIp);
     for (String seedNodeIP : seedNodes) {
       if ((isLocalCluster && !seedNodeIP.contains(localhostIp)) ||
           (!isLocalCluster && seedNodeIP.contains(localhostIp))) {
         logger.error(
-            "cluster_rpc_ip={} and seed_nodes={} should be consistent, both use local ip or real ip please",
-            configClusterRpcIp, seedNodes);
+            "rpc_ip={} and seed_nodes={} should be consistent, both use local ip or real ip please",
+            rpcIp, seedNodes);
         return false;
       }
     }
     return true;
+  }
+
+
+  private static void replaceDefaultProps(String[] params) {
+    Options options = new Options();
+
+//    Option metaPort = new Option(OPTION_INTERVAL_META_PORT, OPTION_INTERVAL_META_PORT, true,
+//        "port for metadata service");
+//    metaPort.setRequired(false);
+//    options.addOption(metaPort);
+//
+//    Option dataPort = new Option(OPTION_INTERVAL_DATA_PORT, OPTION_INTERVAL_DATA_PORT, true,
+//        "port for data service");
+//    dataPort.setRequired(false);
+//    options.addOption(dataPort);
+//
+//    Option clusterRpcPort = new Option(OPTION_CLUSTER_RPC_PORT, OPTION_CLUSTER_RPC_PORT, true,
+//        "port for client service");
+//    clusterRpcPort.setRequired(false);
+//    options.addOption(clusterRpcPort);
+//
+//    Option clusterRpcIP = new Option(OPTION_CLUSTER_RPC_IP, OPTION_CLUSTER_RPC_IP, true,
+//        "IP for client service");
+//    clusterRpcIP.setRequired(false);
+//    options.addOption(clusterRpcIP);
+//
+//    Option seedNodes = new Option(OPTION_SEED_NODES, OPTION_SEED_NODES, true,
+//        "comma-separated {IP/DOMAIN}:meta_port:data_port:client_port pairs");
+//    seedNodes.setRequired(false);
+//    options.addOption(seedNodes);
+//
+//    Option debugRpcPort = new Option(OPTION_DEBUG_RPC_PORT, OPTION_DEBUG_RPC_PORT, true,
+//        "port for debug client service (using single node mode)");
+//    clusterRpcPort.setRequired(false);
+//    options.addOption(debugRpcPort);
+
+    CommandLine commandLine = parseCommandLine(options, params);
+    if (commandLine == null) {
+      logger.error("replaces properties failed, use default conf params");
+    } else {
+//      ClusterConfig clusterConfig = ClusterDescriptor.getInstance().getConfig();
+//      if (commandLine.hasOption(OPTION_INTERVAL_META_PORT)) {
+//        clusterConfig.setInternalMetaPort(Integer.parseInt(commandLine.getOptionValue(
+//            OPTION_INTERVAL_META_PORT)));
+//        logger.debug("replace local meta port with={}", clusterConfig.getInternalMetaPort());
+//      }
+//
+//      if (commandLine.hasOption(OPTION_INTERVAL_DATA_PORT)) {
+//        clusterConfig.setInternalDataPort(Integer.parseInt(commandLine.getOptionValue(
+//            OPTION_INTERVAL_DATA_PORT)));
+//        logger.debug("replace local data port with={}", clusterConfig.getInternalDataPort());
+//      }
+//
+//      if (commandLine.hasOption(OPTION_CLUSTER_RPC_PORT)) {
+//        clusterConfig.setClusterRpcPort(Integer.parseInt(commandLine.getOptionValue(
+//            OPTION_CLUSTER_RPC_PORT)));
+//        logger.debug("replace local cluster rpc port with={}", clusterConfig.getClusterRpcPort());
+//      }
+//
+//      if (commandLine.hasOption(OPTION_CLUSTER_RPC_IP)) {
+//        IoTDBDescriptor.getInstance().getConfig()
+//            .setRpcAddress(commandLine.getOptionValue(OPTION_CLUSTER_RPC_IP));
+//        logger.debug("replace local cluster rpc port with={}", clusterConfig.getClusterRpcPort());
+//      }
+//
+//      if (commandLine.hasOption(OPTION_SEED_NODES)) {
+//        String seedNodeUrls = commandLine.getOptionValue(OPTION_SEED_NODES);
+//        clusterConfig.setSeedNodeUrls(ClusterDescriptor.getSeedUrlList(seedNodeUrls));
+//        logger.debug("replace seed nodes with={}", clusterConfig.getSeedNodeUrls());
+//      }
+//
+//      if (commandLine.hasOption(OPTION_DEBUG_RPC_PORT)) {
+//        IoTDBDescriptor.getInstance().getConfig().setRpcPort(Integer.parseInt(commandLine.getOptionValue(
+//            OPTION_DEBUG_RPC_PORT)));
+//        IoTDBDescriptor.getInstance().getConfig().setEnableRPCService(true);
+//        logger.debug("replace local cluster (single node) rpc port with={}", commandLine.getOptionValue(
+//            OPTION_DEBUG_RPC_PORT));
+//      }
+    }
+  }
+
+  private static CommandLine parseCommandLine(Options options, String[] params) {
+    try {
+      CommandLineParser parser = new DefaultParser();
+      return parser.parse(options, params);
+    } catch (ParseException e) {
+      logger.error("parse conf params failed", e);
+      return null;
+    }
   }
 
   private static void doRemoveNode(String[] args) throws IOException {

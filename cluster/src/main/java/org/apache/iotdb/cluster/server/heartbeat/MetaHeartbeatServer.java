@@ -32,8 +32,11 @@ import org.apache.thrift.transport.TNonblockingServerSocket;
 import org.apache.thrift.transport.TServerSocket;
 import org.apache.thrift.transport.TServerTransport;
 import org.apache.thrift.transport.TTransportException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class MetaHeartbeatServer extends HeartbeatServer {
+  private static Logger logger = LoggerFactory.getLogger(MetaHeartbeatServer.class);
 
   private MetaClusterServer metaClusterServer;
 
@@ -61,12 +64,14 @@ public class MetaHeartbeatServer extends HeartbeatServer {
 
   @Override
   TServerTransport getHeartbeatServerSocket() throws TTransportException {
+    logger.info("[{}] Cluster node will listen {}:{}", getServerClientName(), config.getInternalIp(),
+        config.getInternalMetaPort() + ClusterUtils.META_HEARTBEAT_PORT_OFFSET);
     if (ClusterDescriptor.getInstance().getConfig().isUseAsyncServer()) {
-      return new TNonblockingServerSocket(new InetSocketAddress(config.getClusterRpcIp(),
+      return new TNonblockingServerSocket(new InetSocketAddress(config.getInternalIp(),
           config.getInternalMetaPort() + ClusterUtils.META_HEARTBEAT_PORT_OFFSET),
           getConnectionTimeoutInMS());
     } else {
-      return new TServerSocket(new InetSocketAddress(config.getClusterRpcIp(),
+      return new TServerSocket(new InetSocketAddress(config.getInternalIp(),
           config.getInternalMetaPort() + ClusterUtils.META_HEARTBEAT_PORT_OFFSET));
     }
   }

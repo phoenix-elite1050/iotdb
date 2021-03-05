@@ -44,6 +44,7 @@ import org.apache.iotdb.cluster.partition.slot.SlotNodeRemovalResult;
 import org.apache.iotdb.cluster.partition.slot.SlotPartitionTable;
 import org.apache.iotdb.cluster.query.ClusterPlanRouter;
 import org.apache.iotdb.cluster.rpc.thrift.Node;
+import org.apache.iotdb.cluster.utils.Constants;
 import org.apache.iotdb.cluster.utils.PartitionUtils;
 import org.apache.iotdb.db.auth.AuthException;
 import org.apache.iotdb.db.engine.StorageEngine;
@@ -196,13 +197,14 @@ public class SlotPartitionTableTest {
 
   private void assertGetHeaderGroup(int start, int last) {
     PartitionGroup group = localTable
-        .getHeaderGroup(new Node("localhost", 30000 + start, start, 40000 + start, 55560 + start));
+        .getHeaderGroup(new Node("localhost", 30000 + start, start, 40000 + start)
+            .setClientIp("localhost").setClientPort(Constants.RPC_PORT + start));
     assertEquals(replica_size, group.size());
-    assertEquals(new Node("localhost", 30000 + start, start, 40000 + start, 55560 + start),
-        group.getHeader());
+    assertEquals(new Node("localhost", 30000 + start, start, 40000 + start)
+        .setClientIp("localhost").setClientPort(Constants.RPC_PORT + start),  group.getHeader());
     assertEquals(
-        new Node("localhost", 30000 + last, last, 40000 + last, 55560 + start),
-        group.get(replica_size - 1));
+        new Node("localhost", 30000 + last, last, 40000 + last)
+            .setClientIp("localhost").setClientPort(Constants.RPC_PORT + start), group.get(replica_size - 1));
   }
 
   private void assertPartitionGroup(PartitionGroup group, int... nodeIds) {
@@ -491,7 +493,8 @@ public class SlotPartitionTableTest {
   }
 
   private Node getNode(int i) {
-    return new Node("localhost", 30000 + i, i, 40000 + i, 55560 + i);
+    return new Node("localhost", 30000 + i, i, 40000 + i)
+        .setClientIp("localhost").setClientPort(Constants.RPC_PORT + i);
   }
 
   @Test

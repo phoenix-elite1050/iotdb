@@ -30,8 +30,8 @@ import org.apache.iotdb.cluster.exception.UnknownLogTypeException;
 import org.apache.iotdb.cluster.log.Log;
 import org.apache.iotdb.cluster.log.LogParser;
 import org.apache.iotdb.cluster.rpc.thrift.Node;
+import org.apache.iotdb.cluster.utils.Constants;
 import org.apache.iotdb.db.exception.metadata.IllegalPathException;
-import org.apache.iotdb.db.exception.query.QueryProcessException;
 import org.apache.iotdb.db.metadata.PartialPath;
 import org.apache.iotdb.db.metadata.mnode.MeasurementMNode;
 import org.apache.iotdb.db.qp.physical.crud.InsertRowPlan;
@@ -89,7 +89,8 @@ public class SerializeLogTest {
     AddNodeLog log = new AddNodeLog();
     log.setCurrLogIndex(2);
     log.setCurrLogTerm(2);
-    log.setNewNode(new Node("apache.iotdb.com", 1234, 1, 4321, 55560));
+    log.setNewNode(new Node("apache.iotdb.com", 1234, 1, 4321).setClientIp("apache.iotdb.com")
+        .setClientPort(Constants.RPC_PORT));
     ByteBuffer byteBuffer = log.serialize();
     Log logPrime = LogParser.getINSTANCE().parse(byteBuffer);
     assertEquals(log, logPrime);

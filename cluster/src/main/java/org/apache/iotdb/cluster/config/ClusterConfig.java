@@ -28,17 +28,16 @@ public class ClusterConfig {
 
   static final String CONFIG_NAME = "iotdb-cluster.properties";
 
-  private String clusterRpcIp = "127.0.0.1";
+  private String internalIp = "127.0.0.1";
   private int internalMetaPort = 9003;
   private int internalDataPort = 40010;
-  private int clusterRpcPort = 55560;
+  private int clusterRpcPort = 6667;
 
   /**
    * each one is a "<IP | domain name>:<meta port>:<data port>:<client port></>" string tuple
    */
   private List<String> seedNodeUrls = Arrays
-      .asList("127.0.0.1:9003:40010:55560", "127.0.0.1:9005:40012:55561",
-          "127.0.0.1:9007:40014:55562");
+      .asList(String.format("127.0.0.1:%d:%d:%d", internalMetaPort, internalDataPort, clusterRpcPort));
 
   @ClusterConsistent
   private boolean isRpcThriftCompressionEnabled = false;
@@ -187,20 +186,12 @@ public class ClusterConfig {
   public void setUseBatchInLogCatchUp(boolean useBatchInLogCatchUp) {
     this.useBatchInLogCatchUp = useBatchInLogCatchUp;
   }
-
-  public String getClusterRpcIp() {
-    return clusterRpcIp;
-  }
-
-  void setClusterRpcIp(String clusterRpcIp) {
-    this.clusterRpcIp = clusterRpcIp;
-  }
-
+  
   public int getInternalMetaPort() {
     return internalMetaPort;
   }
 
-  void setInternalMetaPort(int internalMetaPort) {
+  public void setInternalMetaPort(int internalMetaPort) {
     this.internalMetaPort = internalMetaPort;
   }
 
@@ -248,7 +239,7 @@ public class ClusterConfig {
     return internalDataPort;
   }
 
-  void setInternalDataPort(int internalDataPort) {
+  public void setInternalDataPort(int internalDataPort) {
     this.internalDataPort = internalDataPort;
   }
 
@@ -256,7 +247,7 @@ public class ClusterConfig {
     return clusterRpcPort;
   }
 
-  void setClusterRpcPort(int clusterRpcPort) {
+  public void setClusterRpcPort(int clusterRpcPort) {
     this.clusterRpcPort = clusterRpcPort;
   }
 
@@ -442,5 +433,13 @@ public class ClusterConfig {
 
   public void setWaitForSlowNode(boolean waitForSlowNode) {
     this.waitForSlowNode = waitForSlowNode;
+  }
+
+  public String getInternalIp() {
+    return internalIp;
+  }
+
+  public void setInternalIp(String internalIp) {
+    this.internalIp = internalIp;
   }
 }

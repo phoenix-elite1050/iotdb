@@ -1251,7 +1251,6 @@ public abstract class RaftMember {
     if (ClusterConstant.EMPTY_NODE.equals(node) || node == null) {
       return null;
     }
-
     try {
       return pool.getClient(node, activatedOnly);
     } catch (IOException e) {

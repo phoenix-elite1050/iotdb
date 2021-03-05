@@ -17,32 +17,46 @@
  * under the License.
  */
 
-package org.apache.iotdb.cluster.log;
+package org.apache.iotdb.cluster.server.member;
 
-import static org.junit.Assert.assertEquals;
-
-import java.nio.ByteBuffer;
+import java.util.List;
+import java.util.Map;
 import org.apache.iotdb.cluster.rpc.thrift.Node;
-import org.apache.iotdb.cluster.utils.Constants;
-import org.junit.Test;
+import org.apache.iotdb.cluster.server.NodeCharacter;
+import org.apache.iotdb.cluster.server.monitor.Peer;
 
-public class HardStateTest {
+/**
+ * interfaces that the mbean of RaftMember will use
+ */
+public interface RaftMemberMBean {
 
-  @Test
-  public void testHardState() {
-    // Not NULL
-    HardState state = new HardState();
-    state.setCurrentTerm(2);
-    state.setVoteFor(new Node("127.0.0.1", 30000, 0, 40000)
-                      .setClientIp("127.0.0.1").setClientPort(Constants.RPC_PORT));
-    ByteBuffer buffer = state.serialize();
-    HardState newState = HardState.deserialize(buffer);
-    assertEquals(state, newState);
+  List<Node> getAllNodes();
 
-    // NULL
-    state.setVoteFor(null);
-    buffer = state.serialize();
-    newState = HardState.deserialize(buffer);
-    assertEquals(state, newState);
-  }
+  String getName();
+
+  Map<Node, Peer> getPeerMap();
+
+  int getTerm();
+
+  NodeCharacter getCharacter();
+
+  Node getLeader();
+
+  Node getVoteFor();
+
+  long getLastHeartbeatReceivedTime();
+
+  boolean isReadOnly();
+
+  void stopHeartBeatService();
+
+  void restartHeartBeatService();
+
+  long getLastReportedLogIndex();
+
+  boolean isCatchUpServiceWorking();
+
+  Map<Node, Long> getLastCatchUpResponseTime();
+
+
 }
